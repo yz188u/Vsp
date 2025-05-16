@@ -1,23 +1,20 @@
-if not _G.Predicting then return end
-
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
 
 local ball = Workspace:WaitForChild("Football")
 local gravity = Vector3.new(0, -Workspace.Gravity, 0)
 local timeStep = 0.02
-local totalSteps = 100 -- Lebih kecil = lebih ringan
+local totalSteps = 150
 local friction = 0.991
 local bounceDamping = 0.8
-local curveStrength = 0.1
+local curveStrength = 0.1 -- makin besar makin belok
 
-local folder = Workspace:FindFirstChild("FootballPrediction") or Instance.new("Folder", Workspace)
+local folder = Instance.new("Folder", Workspace)
 folder.Name = "FootballPrediction"
 
 local ballSize = ball.Size.Magnitude
 local dotSize = ballSize * 1.2
-local distanceBetweenDots = 6 -- jarangin titik
+local distanceBetweenDots = 3 -- dalam stud
 
 local function HSVtoRGB(h, s, v)
 	local i = math.floor(h * 6)
@@ -36,7 +33,7 @@ local function HSVtoRGB(h, s, v)
 end
 
 local function createDot(position, t)
-	local color = HSVtoRGB(t % 1, 1, 1)
+	local color = HSVtoRGB(t % 1, 1, 1) -- rainbow smooth
 	local dot = Instance.new("Part")
 	dot.Anchored = true
 	dot.CanCollide = false
@@ -44,10 +41,13 @@ local function createDot(position, t)
 	dot.Shape = Enum.PartType.Ball
 	dot.Material = Enum.Material.SmoothPlastic
 	dot.Color = color
-	dot.Transparency = math.clamp(0.7 - (t * 0.5), 0.15, 0.7)
+
+	-- Gradien transparansi (dari transparan ke solid)
+	local transparency = math.clamp(0.7 - (t * 0.5), 0.15, 0.7)
+	dot.Transparency = transparency
+
 	dot.Position = position
 	dot.Parent = folder
-	Debris:AddItem(dot, 1.2) -- Auto destroy
 end
 
 local function reflect(velocity, normal)
@@ -58,17 +58,9 @@ local function isValidHit(hit)
 	return hit and hit.CanCollide and hit.Transparency < 0.9
 end
 
--- Interval biar gak lag
-local lastUpdate = 0
-local updateInterval = 0.2
-
-RunService.Heartbeat:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
 	if not _G.Predicting then return end
-
-	lastUpdate += dt
-	if lastUpdate < updateInterval then return end
-	lastUpdate = 0
-
+	folder:ClearAllChildren()
 	local pos = ball.Position
 	local vel = ball.AssemblyLinearVelocity
 	local spin = ball.AssemblyAngularVelocity
@@ -82,6 +74,7 @@ RunService.Heartbeat:Connect(function(dt)
 		local newVel = vel + gravity * timeStep
 		newVel *= friction
 
+		-- Tambahin efek belokan dari spin bola
 		local sideForce = spin:Cross(Vector3.new(0, 1, 0)) * curveStrength
 		newVel += sideForce
 
