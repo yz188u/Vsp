@@ -4,28 +4,29 @@ local Workspace = game:GetService("Workspace")
 local ball = Workspace:WaitForChild("Football")
 local gravity = Vector3.new(0, -Workspace.Gravity, 0)
 local timeStep = 0.02
-local totalSteps = 200
+local totalSteps = 150
 local friction = 0.991
 local bounceDamping = 0.8
 local curveStrength = 0.1
-local distanceBetweenDots = 3
 
 local folder = Instance.new("Folder", Workspace)
 folder.Name = "FootballPrediction"
 
-local blockSize = Vector3.new(1, 0.2, 3) -- persegi panjang memanjang ke arah gerak
+-- Fungsi buat bikin garis persegi panjang dari titik A ke B
+local function createLine(from, to)
+	local distance = (to - from).Magnitude
+	local midPoint = (from + to) / 2
+	local direction = (to - from).Unit
 
-local function createBlock(position, direction)
-	local block = Instance.new("Part")
-	block.Anchored = true
-	block.CanCollide = false
-	block.Size = blockSize
-	block.Material = Enum.Material.SmoothPlastic
-	block.Color = Color3.fromRGB(255, 255, 0) -- kuning sederhana
-	block.Transparency = 0.3
-
-	block.CFrame = CFrame.new(position, position + direction) * CFrame.new(0, 0, -blockSize.Z/2)
-	block.Parent = folder
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.Size = Vector3.new(0.5, 0.5, distance)
+	part.CFrame = CFrame.new(midPoint, to)
+	part.Color = Color3.fromRGB(255, 255, 0)
+	part.Material = Enum.Material.SmoothPlastic
+	part.Transparency = 0.3
+	part.Parent = folder
 end
 
 local function reflect(velocity, normal)
@@ -43,7 +44,10 @@ RunService.RenderStepped:Connect(function()
 	local pos = ball.Position
 	local vel = ball.AssemblyLinearVelocity
 	local spin = ball.AssemblyAngularVelocity
+
+	local startPos = pos
 	local lastPos = pos
+	local segments = {}
 
 	for i = 1, totalSteps do
 		local newVel = vel + gravity * timeStep
@@ -56,20 +60,26 @@ RunService.RenderStepped:Connect(function()
 		local ray = Workspace:Raycast(pos, move, RaycastParams.new())
 
 		if ray and isValidHit(ray.Instance) then
+			local endPos = ray.Position
+			table.insert(segments, {lastPos, endPos})
 			pos = ray.Position + ray.Normal * 0.1
 			vel = reflect(newVel, ray.Normal) * bounceDamping
+			lastPos = pos
 		else
 			pos += move
-			vel = newVel
-		end
-
-		if (pos - lastPos).Magnitude >= distanceBetweenDots then
-			createBlock(pos, move.Unit)
-			lastPos = pos
 		end
 
 		if vel.Magnitude < 0.5 then
+			table.insert(segments, {lastPos, pos})
 			break
 		end
+
+		-- Batasi jumlah garis, biar ringan
+		if #segments >= 5 then break end
+	end
+
+	-- Bikin garis dari semua segmen
+	for _, seg in ipairs(segments) do
+		createLine(seg[1], seg[2])
 	end
 end)
