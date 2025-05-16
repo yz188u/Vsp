@@ -4,50 +4,28 @@ local Workspace = game:GetService("Workspace")
 local ball = Workspace:WaitForChild("Football")
 local gravity = Vector3.new(0, -Workspace.Gravity, 0)
 local timeStep = 0.02
-local totalSteps = 150
+local totalSteps = 200
 local friction = 0.991
 local bounceDamping = 0.8
-local curveStrength = 0.1 -- makin besar makin belok
+local curveStrength = 0.1
+local distanceBetweenDots = 3
 
 local folder = Instance.new("Folder", Workspace)
 folder.Name = "FootballPrediction"
 
-local ballSize = ball.Size.Magnitude
-local dotSize = ballSize * 1.2
-local distanceBetweenDots = 3 -- dalam stud
+local blockSize = Vector3.new(1, 0.2, 3) -- persegi panjang memanjang ke arah gerak
 
-local function HSVtoRGB(h, s, v)
-	local i = math.floor(h * 6)
-	local f = h * 6 - i
-	local p = v * (1 - s)
-	local q = v * (1 - f * s)
-	local t = v * (1 - (1 - f) * s)
-	local r, g, b
-	if i % 6 == 0 then r, g, b = v, t, p
-	elseif i == 1 then r, g, b = q, v, p
-	elseif i == 2 then r, g, b = p, v, t
-	elseif i == 3 then r, g, b = p, q, v
-	elseif i == 4 then r, g, b = t, p, v
-	elseif i == 5 then r, g, b = v, p, q end
-	return Color3.new(r, g, b)
-end
+local function createBlock(position, direction)
+	local block = Instance.new("Part")
+	block.Anchored = true
+	block.CanCollide = false
+	block.Size = blockSize
+	block.Material = Enum.Material.SmoothPlastic
+	block.Color = Color3.fromRGB(255, 255, 0) -- kuning sederhana
+	block.Transparency = 0.3
 
-local function createDot(position, t)
-	local color = HSVtoRGB(t % 1, 1, 1) -- rainbow smooth
-	local dot = Instance.new("Part")
-	dot.Anchored = true
-	dot.CanCollide = false
-	dot.Size = Vector3.new(dotSize, dotSize, dotSize)
-	dot.Shape = Enum.PartType.Ball
-	dot.Material = Enum.Material.SmoothPlastic
-	dot.Color = color
-
-	-- Gradien transparansi (dari transparan ke solid)
-	local transparency = math.clamp(0.7 - (t * 0.5), 0.15, 0.7)
-	dot.Transparency = transparency
-
-	dot.Position = position
-	dot.Parent = folder
+	block.CFrame = CFrame.new(position, position + direction) * CFrame.new(0, 0, -blockSize.Z/2)
+	block.Parent = folder
 end
 
 local function reflect(velocity, normal)
@@ -61,20 +39,16 @@ end
 RunService.RenderStepped:Connect(function()
 	if not _G.Predicting then return end
 	folder:ClearAllChildren()
+
 	local pos = ball.Position
 	local vel = ball.AssemblyLinearVelocity
 	local spin = ball.AssemblyAngularVelocity
-
-	local lastDotPos = pos
-	createDot(pos, 0)
-
-	local colorProgress = 0
+	local lastPos = pos
 
 	for i = 1, totalSteps do
 		local newVel = vel + gravity * timeStep
 		newVel *= friction
 
-		-- Tambahin efek belokan dari spin bola
 		local sideForce = spin:Cross(Vector3.new(0, 1, 0)) * curveStrength
 		newVel += sideForce
 
@@ -89,14 +63,12 @@ RunService.RenderStepped:Connect(function()
 			vel = newVel
 		end
 
-		if (pos - lastDotPos).Magnitude >= distanceBetweenDots then
-			colorProgress += 0.025
-			createDot(pos, colorProgress)
-			lastDotPos = pos
+		if (pos - lastPos).Magnitude >= distanceBetweenDots then
+			createBlock(pos, move.Unit)
+			lastPos = pos
 		end
 
 		if vel.Magnitude < 0.5 then
-			createDot(pos, 1)
 			break
 		end
 	end
